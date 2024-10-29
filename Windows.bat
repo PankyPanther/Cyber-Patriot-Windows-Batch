@@ -57,32 +57,60 @@ if %errorlevel%==0 (
 
 :policies
 
-    :: Configure password policies
-    echo Enforcing password history to remember the last 5 passwords...
-    net accounts /uniquepw:24
+    :passpolicies
+        :: Configure password policies
+        echo Enforcing password history to remember the last 6 passwords...
+        net accounts /uniquepw:6
 
-    echo Setting maximum password age to 60 days...
-    net accounts /maxpwage:60
+        echo Setting maximum password age to 90 days...
+        net accounts /maxpwage:90
 
-    echo Setting minimum password age to 1 day...
-    net accounts /minpwage:1
+        echo Setting minimum password age to 30 day...
+        net accounts /minpwage:30
 
-    echo Setting minimum password length to 8 characters...
-    net accounts /minpwlen:10
+        echo Setting minimum password length to 11 characters...
+        net accounts /minpwlen:11
 
-    :: Enable password complexity requirements
-    echo Enabling password complexity requirements...
-    reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa" /v "PasswordComplexity" /t REG_DWORD /d 1 /f
+        :: Enable password complexity requirements
+        echo Enabling password complexity requirements...
+        powershell.exe "secedit /export /cfg .\secpol.cfg"
+        powershell.exe "(gc .\secpol.cfg).replace('PasswordComplexity = 0', 'PasswordComplexity = 1') | Out-File .\secpol.cfg"
+        powershell.exe "secedit /configure /db $env:SystemDrive\windows\security\local.sdb /cfg .\secpol.cfg /areas SECURITYPOLICY" 
+        powershell.exe "rm -force .\secpol.cfg -confirm:$false"
 
-    :: Disable storing passwords using reversible encryption
-    echo Disabling store passwords using reversible encryption...
-    reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa" /v "ClearTextPassword" /t REG_DWORD /d 0 /f
+        :: Disable storing passwords using reversible encryption
+        echo Disabling store passwords using reversible encryption...
+        powershell.exe "secedit /export /cfg .\secpol.cfg"
+        powershell.exe "(gc .\secpol.cfg).replace('ClearTextPassword = 1', 'ClearTextPassword = 0') | Out-File .\secpol.cfg"
+        powershell.exe "secedit /configure /db $env:SystemDrive\windows\security\local.sdb /cfg .\secpol.cfg /areas SECURITYPOLICY" 
+        powershell.exe "rm -force .\secpol.cfg -confirm:$false"
 
-    :: Force update group policies
+        echo Password policies have been configured.
+        pause
+
+
+    :lockpolicies
+        echo Configuring Account Lockout Policy...
+        :: Set Account Lockout Threshold to 10 failed logon attempts
+        net accounts /lockoutthreshold:10
+
+        :: Set Lockout Duration to 30 minutes
+        net accounts /lockoutduration:30
+
+        :: Set Reset Account Lockout Counter After to 30 minutes
+        net accounts /lockoutwindow:30
+
+        echo Account Lockout Policy has been configured.
+        echo Lockout Duration: 30 minutes
+        echo Account Lockout Threshold: 10 failed attempts
+        echo Reset Account Lockout Counter After: 30 minutes
+        pause
+
+
+    :: Force policy update
     echo Updating group policies...
     gpupdate /force
 
-    echo Password policies have been configured.
 
     pause
     goto :menu
@@ -150,6 +178,7 @@ if %errorlevel%==0 (
 
 
 :umanager
+
     :: Prompt the user for the location of the text file
     set /p filePath="Enter the full path of the text file containing authorized users: "
 
@@ -227,8 +256,13 @@ if %errorlevel%==0 (
                     for /l %%i in (1,1,!adminIndex!) do (
                         if "!adminUsername[%%i]!"=="!username!" (
                             if "!role!"==" user" (
-                                echo Granting admin permissions to !username!...
-                                net localgroup Administrators !username! /add
+                                set /p confirm="Grant admin permissions to !username!? (Y/N): "
+                                if /i "!confirm!"=="Y" (
+                                    echo Granting admin permissions to !username!...
+                                    net localgroup Administrators !username! /add
+                                ) else (
+                                    echo Skipping granting admin permissions to !username!.
+                                )
                             )
                         )
                     )
@@ -237,8 +271,13 @@ if %errorlevel%==0 (
                     for /l %%j in (1,1,!userIndex!) do (
                         if "!userUsername[%%j]!"=="!username!" (
                             if "!role!"==" admin" (
-                                echo Revoking admin permissions from !username!...
-                                net localgroup Administrators !username! /delete
+                                set /p confirm="Revoke admin permissions from !username!? (Y/N): "
+                                if /i "!confirm!"=="Y" (
+                                    echo Revoking admin permissions from !username!...
+                                    net localgroup Administrators !username! /delete
+                                ) else (
+                                    echo Skipping revoking admin permissions from !username!.
+                                )
                             )
                         )
                     )
@@ -279,15 +318,25 @@ if %errorlevel%==0 (
                 )
             )
 
-            :: If the user is not authorized, delete them
+            :: If the user is not authorized, ask for confirmation before deleting
             if !isAuthorized! equ 0 (
-                echo Deleting unauthorized user: !currentUser!...
-                net user "!currentUser!" /delete
+                set /p confirm="Delete unauthorized user: !currentUser!? (Y/N): "
+                if /i "!confirm!"=="Y" (
+                    echo Deleting unauthorized user: !currentUser!...
+                    net user "!currentUser!" /delete
+                ) else (
+                    echo Skipping deletion of unauthorized user: !currentUser!.
+                )
             ) else (
-                :: If the user is authorized, change their password
+                :: If the user is authorized, ask for confirmation before changing their password
                 if "!currentUser!" NEQ "%USERNAME%" (
-                    echo Changing password for user: !currentUser!...
-                    net user "!currentUser!" "!securePassword!"
+                    set /p confirm="Change password for user: !currentUser!? (Y/N): "
+                    if /i "!confirm!"=="Y" (
+                        echo Changing password for user: !currentUser!...
+                        net user "!currentUser!" "!securePassword!"
+                    ) else (
+                        echo Skipping password change for user: !currentUser!.
+                    )
                 )
             )
         )
