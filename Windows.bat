@@ -56,117 +56,48 @@ if %errorlevel%==0 (
     goto :menu
 
 :policies
-    :: Set Enforce Password History to 24
+
+    :: Configure password policies
+    echo Enforcing password history to remember the last 5 passwords...
     net accounts /uniquepw:24
 
-    :: Set Maximum Password Age to 60 days
+    echo Setting maximum password age to 60 days...
     net accounts /maxpwage:60
 
-    :: Set Minimum Password Age to 1 day
+    echo Setting minimum password age to 1 day...
     net accounts /minpwage:1
 
-    :: Set Minimum Password Length to 10 characters
+    echo Setting minimum password length to 8 characters...
     net accounts /minpwlen:10
 
-    :: Enable Password Complexity Requirements
-    secedit /export /cfg %temp%\secpol.cfg
-    (for /f "tokens=*" %%i in ('findstr /v "PasswordComplexity" %temp%\secpol.cfg') do @echo %%i) > %temp%\newsecpol.cfg
-    echo "PasswordComplexity = 1" >> %temp%\newsecpol.cfg
-    secedit /configure /db %temp%\secedit.sdb /cfg %temp%\newsecpol.cfg
+    :: Enable password complexity requirements
+    echo Enabling password complexity requirements...
+    reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa" /v "PasswordComplexity" /t REG_DWORD /d 1 /f
 
-    :: Disable Store Password using Reversible Encryption
-    (for /f "tokens=*" %%i in ('findstr /v "ClearTextPassword" %temp%\newsecpol.cfg') do @echo %%i) > %temp%\finalsecpol.cfg
-    echo "ClearTextPassword = 0" >> %temp%\finalsecpol.cfg
-    secedit /configure /db %temp%\secedit.sdb /cfg %temp%\finalsecpol.cfg
+    :: Disable storing passwords using reversible encryption
+    echo Disabling store passwords using reversible encryption...
+    reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa" /v "ClearTextPassword" /t REG_DWORD /d 0 /f
 
-    :: Clean up temporary files
-    del %temp%\secpol.cfg
-    del %temp%\newsecpol.cfg
-    del %temp%\finalsecpol.cfg
+    :: Force update group policies
+    echo Updating group policies...
+    gpupdate /force
 
     echo Password policies have been configured.
-
-
-    :: Set Account Lockout Threshold to 10 invalid logon attempts
-    net accounts /lockoutthreshold:10
-
-    :: Set Account Lockout Duration to 30 minutes
-    net accounts /lockoutduration:30
-
-    :: Set Reset Account Lockout Counter After to 30 minutes
-    net accounts /lockoutwindow:30
-
-    echo Account lockout policies have been configured.
-
-
-    echo Forcing all users to change password at next logon...
-
-    :: Loop through all local users and set 'Password expires' to True
-    for /f "tokens=*" %%a in ('wmic useraccount where "LocalAccount='TRUE' and Disabled='FALSE'" get Name /value ^| findstr "="') do (
-        set "user=%%a"
-        setlocal enabledelayedexpansion
-        set "username=!user:~5!"
-        wmic UserAccount where Name="!username!" set PasswordExpires=True
-        wmic UserAccount where Name="!username!" set PasswordChangeable=True
-        net user "!username!" /logonpasswordchg:yes
-        endlocal
-    )
-
-    echo All users must change their password at next logon.
-
-
-    echo Enabling restriction of blank passwords for local accounts...
-
-    :: Enable the policy to limit blank passwords to console logon only
-    secedit /set /cfg "C:\Windows\security\local.sdb" /v "LimitBlankPasswordUse" /t REG_DWORD /d 1 /f
-
-    :: Verify that the policy was set
-    secedit /export /cfg %temp%\secpol.cfg
-    findstr /C:"LimitBlankPasswordUse" %temp%\secpol.cfg
-
-    echo Blank password usage has been limited to console logon only.
-
-    echo Enabling the policy to prevent account enumeration...
-
-    :: Enable the policy to prevent enumeration of the same accounts
-    secedit /set /cfg "C:\Windows\security\local.sdb" /v "LimitBlankPasswordUse" /t REG_DWORD /d 1 /f
-
-    :: Verify that the policy was set
-    secedit /export /cfg %temp%\secpol.cfg
-    findstr /C:"LimitBlankPasswordUse" %temp%\secpol.cfg
-
-    echo Account enumeration policy has been enabled.
 
     pause
     goto :menu
 
 
 :services
-    echo Stopping and disabling services...
 
-    :: Define the services to be stopped and disabled
-    set services=TapiSrv TlntSvr ftpsvc SNMP SessionEnv TermService UmRdpService SharedAccess remoteRegistry SSDPSRV W3SVC SNMPTRAP remoteAccess RpcSs HomeGroupProvider HomeGroupListener
+    :: Disable Microsoft FTP Service
+    echo Stopping Microsoft FTP Service...
+    net stop ftpsvc >nul 2>&1
 
-    :: Loop through each service and perform stop and disable actions
-    for %%s in (%services%) do (
-        echo Stopping %%s...
-        sc stop %%s
-        echo Disabling %%s...
-        sc config %%s start= disabled
-    )
+    echo Disabling Microsoft FTP Service startup...
+    sc config ftpsvc start= disabled >nul 2>&1
 
-    echo All specified services have been stopped and disabled.
-
-
-    echo Stopping and disabling Microsoft FTP Service...
-
-    :: Stop the FTP service
-    net stop "Microsoft FTP Service"
-
-    :: Disable the FTP service
-    sc config "Microsoft FTP Service" start= disabled
-
-    echo Microsoft FTP Service has been stopped and disabled.
+    echo Microsoft FTP Service has been disabled.
 
     pause
     goto :menu
@@ -181,6 +112,8 @@ if %errorlevel%==0 (
 
     :: Optionally, disable Remote Assistance
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v "fAllowToGetHelp" /t REG_DWORD /d 0 /f
+    reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Remote Assistance" /v fAllowToGetHelp /t REG_DWORD /d 0 /f
+
 
     echo Remote connections have been disabled.
 
@@ -225,7 +158,7 @@ if %errorlevel%==0 (
     echo Current user: !currentUser!
 
     :: Define a secure password
-    set "securePassword=SecureP@ssword123!"
+    set "securePassword=LittleBobby@123!"
 
     :: Check if the file exists
     if exist "%filePath%" (
