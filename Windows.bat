@@ -378,7 +378,7 @@ if %errorlevel%==0 (
     set /p confirm="Do you want to install these updates? (Y/N): "
     if /I "%confirm%"=="Y" (
         echo Installing updates...
-        powershell -command "Install-WindowsUpdate -AcceptAll -AutoReboot"
+        powershell -command "Install-WindowsUpdate -AcceptAll"
     ) else (
         echo Updates not installed.
     )
