@@ -106,6 +106,15 @@ if %errorlevel%==0 (
         echo Reset Account Lockout Counter After: 30 minutes
         pause
 
+    
+    :securepolicies
+        :: Set policy to restrict blank passwords to console logins only
+        echo Enabling Limit Blank Pass use
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v LimitBlankPasswordUse /t REG_DWORD /d 1 /f >nul 2>&1
+        :: Set policy to disable anonymous enumeration of SAM accounts
+        echo Enabling Sam Settings
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RestrictAnonymous /t REG_DWORD /d 1 /f
+
 
     :: Force policy update
     echo Updating group policies...
