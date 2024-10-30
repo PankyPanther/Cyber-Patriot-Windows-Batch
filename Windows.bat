@@ -43,6 +43,11 @@ if %errorlevel%==0 (
 
 		if "%answer%"=="-1" exit
 		if "%answer%"=="69" shutdown /r
+
+        :: Catch goons who cant read or type
+        echo Input Valid Choice
+        pause
+        goto :menu
 	pause
 
 
