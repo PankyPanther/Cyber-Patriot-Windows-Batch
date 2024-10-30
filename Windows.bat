@@ -25,6 +25,7 @@ if %errorlevel%==0 (
     echo "1) Enable Firewall           2) Correct Policy Settings                                                                     "
     echo "3) Services                  4) Disable Remote Connections                                                                  "
     echo "5) Create Group              6) User Management                                                                             "
+    echo "7) Windows Update                                                                                                           "
     echo "                                                                                                                            "
     echo "                               -1) Exit                        69) Reboot                                                   "
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -38,6 +39,7 @@ if %errorlevel%==0 (
         if "%answer%"=="4" goto :remconnect
         if "%answer%"=="5" goto :cgroup
         if "%answer%"=="6" goto :umanager
+        if "%answer%"=="7" goto :winupdate
 
 		if "%answer%"=="-1" exit
 		if "%answer%"=="69" shutdown /r
@@ -353,6 +355,28 @@ if %errorlevel%==0 (
         echo File not found: "%filePath%"
     )
 
+
+    pause
+    goto :menu
+
+
+:winupdate
+
+    :: Check if PSWindowsUpdate module is installed
+    powershell -command "if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) { Install-Module -Name PSWindowsUpdate -Force -Scope CurrentUser -Confirm:$false }"
+
+    echo Checking for Windows Updates...
+    :: List available updates
+    powershell -command "Get-WindowsUpdate"
+
+    echo.
+    set /p confirm="Do you want to install these updates? (Y/N): "
+    if /I "%confirm%"=="Y" (
+        echo Installing updates...
+        powershell -command "Install-WindowsUpdate -AcceptAll -AutoReboot"
+    ) else (
+        echo Updates not installed.
+    )
 
     pause
     goto :menu
